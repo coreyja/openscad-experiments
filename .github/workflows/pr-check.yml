@@ -56,42 +56,23 @@ jobs:
           echo "files=[]" >> $GITHUB_OUTPUT
         fi
     
-    - name: Upload images to GitHub Pages branch
+    - name: Upload individual preview artifacts
       shell: bash
       run: |
         if [ -d "preview_output" ] && [ "$(ls -A preview_output/*.png 2>/dev/null)" ]; then
-          # Create a branch for hosting images
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Check if branch exists, create if not
-          git fetch origin gh-pages || git checkout --orphan gh-pages || true
-          git checkout gh-pages || git checkout -b gh-pages
-          
-          # Create directory for this PR
-          mkdir -p "pr-${{ github.event.pull_request.number }}"
-          
-          # Copy images
           for png_file in preview_output/*.png; do
             if [ -f "$png_file" ]; then
               base_name=$(basename "$png_file" .png)
-              cp "$png_file" "pr-${{ github.event.pull_request.number }}/${base_name}.png"
-              echo "Copied $base_name.png to gh-pages branch"
+              echo "Preparing individual artifact for: ${base_name}.png"
+              
+              # Create individual directory for this file
+              mkdir -p "/tmp/individual_artifacts/${base_name}"
+              cp "$png_file" "/tmp/individual_artifacts/${base_name}/"
             fi
           done
-          
-          # Commit and push
-          git add "pr-${{ github.event.pull_request.number }}/"
-          git commit -m "Add preview images for PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
-          git push origin gh-pages || echo "Failed to push to gh-pages"
-          
-          # Go back to original branch
-          git checkout ${{ github.ref_name }}
         fi
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
-    - name: Upload preview artifacts (fallback)
+    - name: Upload combined preview artifacts
       uses: actions/upload-artifact@v4
       if: always()
       with:
