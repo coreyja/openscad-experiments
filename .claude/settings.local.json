@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(jj describe:*)",
+      "Bash(jj new:*)"
+    ],
+    "deny": []
+  }
+}

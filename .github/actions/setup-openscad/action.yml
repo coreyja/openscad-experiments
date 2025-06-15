@@ -3,8 +3,8 @@ description: 'Install OpenSCAD and dependencies for headless rendering'
 runs:
   using: 'composite'
   steps:
-    - name: Install OpenSCAD
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y openscad xvfb
+    - name: Cache and install OpenSCAD packages
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: openscad xvfb
+        version: 1.0
