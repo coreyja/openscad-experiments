@@ -31,22 +31,67 @@ jobs:
       id: generate-previews
       uses: ./.github/actions/generate-previews
     
-    - name: List generated files
+    - name: Find PNG files and create artifact list
+      id: find-pngs
       shell: bash
-      id: list-files
       run: |
         if [ -d "preview_output" ] && [ "$(ls -A preview_output/*.png 2>/dev/null)" ]; then
-          file_list=""
+          files_json="["
+          first=true
           for png_file in preview_output/*.png; do
             if [ -f "$png_file" ]; then
               base_name=$(basename "$png_file" .png)
-              file_list="${file_list} ${base_name}"
+              if [ "$first" = true ]; then
+                first=false
+              else
+                files_json="$files_json,"
+              fi
+              files_json="$files_json\"$base_name\""
             fi
           done
-          echo "files=${file_list}" >> $GITHUB_OUTPUT
+          files_json="$files_json]"
+          echo "files=$files_json" >> $GITHUB_OUTPUT
+          echo "Found files: $files_json"
+        else
+          echo "files=[]" >> $GITHUB_OUTPUT
         fi
     
-    - name: Upload preview artifacts
+    - name: Upload images to GitHub Pages branch
+      shell: bash
+      run: |
+        if [ -d "preview_output" ] && [ "$(ls -A preview_output/*.png 2>/dev/null)" ]; then
+          # Create a branch for hosting images
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Check if branch exists, create if not
+          git fetch origin gh-pages || git checkout --orphan gh-pages || true
+          git checkout gh-pages || git checkout -b gh-pages
+          
+          # Create directory for this PR
+          mkdir -p "pr-${{ github.event.pull_request.number }}"
+          
+          # Copy images
+          for png_file in preview_output/*.png; do
+            if [ -f "$png_file" ]; then
+              base_name=$(basename "$png_file" .png)
+              cp "$png_file" "pr-${{ github.event.pull_request.number }}/${base_name}.png"
+              echo "Copied $base_name.png to gh-pages branch"
+            fi
+          done
+          
+          # Commit and push
+          git add "pr-${{ github.event.pull_request.number }}/"
+          git commit -m "Add preview images for PR #${{ github.event.pull_request.number }}" || echo "No changes to commit"
+          git push origin gh-pages || echo "Failed to push to gh-pages"
+          
+          # Go back to original branch
+          git checkout ${{ github.ref_name }}
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload preview artifacts (fallback)
       uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -59,6 +104,6 @@ jobs:
       uses: ./.github/actions/pr-comment
       with:
         preview-files: ${{ steps.generate-previews.outputs.preview-files }}
-        file-list: ${{ steps.list-files.outputs.files }}
+        file-list: ${{ steps.find-pngs.outputs.files }}
         pr-number: ${{ github.event.pull_request.number }}
         github-token: ${{ secrets.GITHUB_TOKEN }}

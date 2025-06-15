@@ -26,17 +26,25 @@ runs:
         echo "Generated preview images for this PR:" >> $GITHUB_OUTPUT
         echo "" >> $GITHUB_OUTPUT
         
-        # Get artifact download URL
+        # Get repository info for GitHub Pages URL
+        repo_owner=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+        repo_name=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+        pages_base_url="https://${repo_owner}.github.io/${repo_name}"
         artifact_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         
         for preview_file in ${{ inputs.preview-files }}; do
           if [ -f "$preview_file" ]; then
             base_name=$(basename "$preview_file" .png)
-            echo "### ${base_name}" >> $GITHUB_OUTPUT
+            image_url="${pages_base_url}/pr-${{ inputs.pr-number }}/${base_name}.png"
+            
+            echo "<details>" >> $GITHUB_OUTPUT
+            echo "<summary>🎲 <strong>${base_name}</strong> - Click to view preview</summary>" >> $GITHUB_OUTPUT
             echo "" >> $GITHUB_OUTPUT
-            echo "📎 [Download all preview images](${artifact_url})" >> $GITHUB_OUTPUT
+            echo "![${base_name} preview](${image_url})" >> $GITHUB_OUTPUT
             echo "" >> $GITHUB_OUTPUT
-            echo "**File**: \`${base_name}.png\`" >> $GITHUB_OUTPUT
+            echo "📎 [Download original file](${artifact_url}) | 🌐 [Direct image link](${image_url})" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "</details>" >> $GITHUB_OUTPUT
             echo "" >> $GITHUB_OUTPUT
           fi
         done
