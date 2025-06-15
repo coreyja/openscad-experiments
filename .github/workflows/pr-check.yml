@@ -1,0 +1,90 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run shellcheck on scripts
+      uses: ./.github/actions/shellcheck
+
+  pr-preview:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup OpenSCAD
+      uses: ./.github/actions/setup-openscad
+    
+    - name: Generate preview images
+      id: generate-previews
+      uses: ./.github/actions/generate-previews
+    
+    - name: Find PNG files and create artifact list
+      id: find-pngs
+      shell: bash
+      run: |
+        if [ -d "preview_output" ] && [ "$(ls -A preview_output/*.png 2>/dev/null)" ]; then
+          files_json="["
+          first=true
+          for png_file in preview_output/*.png; do
+            if [ -f "$png_file" ]; then
+              base_name=$(basename "$png_file" .png)
+              if [ "$first" = true ]; then
+                first=false
+              else
+                files_json="$files_json,"
+              fi
+              files_json="$files_json\"$base_name\""
+            fi
+          done
+          files_json="$files_json]"
+          echo "files=$files_json" >> $GITHUB_OUTPUT
+          echo "Found files: $files_json"
+        else
+          echo "files=[]" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Upload individual preview artifacts
+      shell: bash
+      run: |
+        if [ -d "preview_output" ] && [ "$(ls -A preview_output/*.png 2>/dev/null)" ]; then
+          for png_file in preview_output/*.png; do
+            if [ -f "$png_file" ]; then
+              base_name=$(basename "$png_file" .png)
+              echo "Preparing individual artifact for: ${base_name}.png"
+              
+              # Create individual directory for this file
+              mkdir -p "/tmp/individual_artifacts/${base_name}"
+              cp "$png_file" "/tmp/individual_artifacts/${base_name}/"
+            fi
+          done
+        fi
+    
+    - name: Upload combined preview artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: openscad-previews-${{ github.event.pull_request.number }}
+        path: preview_output/
+        retention-days: 30
+        if-no-files-found: ignore
+    
+    - name: Create PR comment with previews
+      uses: ./.github/actions/pr-comment
+      with:
+        preview-files: ${{ steps.generate-previews.outputs.preview-files }}
+        file-list: ${{ steps.find-pngs.outputs.files }}
+        pr-number: ${{ github.event.pull_request.number }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}

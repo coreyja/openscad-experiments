@@ -1,0 +1,54 @@
+name: 'Create PR Comment with Previews'
+description: 'Create or update a PR comment with preview image links'
+inputs:
+  preview-files:
+    description: 'Space-separated list of preview image files'
+    required: true
+  file-list:
+    description: 'Space-separated list of file base names'
+    required: false
+  pr-number:
+    description: 'Pull request number'
+    required: true
+  github-token:
+    description: 'GitHub token for commenting'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Create comment with preview links
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+      run: |
+        # Create comment body
+        comment_body="## 🎲 OpenSCAD Preview Images"$'\n\n'"Generated preview images for this PR:"$'\n\n'
+        
+        # List preview files
+        for preview_file in ${{ inputs.preview-files }}; do
+          if [ -f "$preview_file" ]; then
+            base_name=$(basename "$preview_file" .png)
+            comment_body="${comment_body}✅ **${base_name}.png**"$'\n'
+          fi
+        done
+        
+        # Add artifact download link
+        artifact_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        comment_body="${comment_body}"$'\n'"📎 [View and download preview images in the workflow artifacts](${artifact_url})"$'\n\n'"---"$'\n'"*Preview images generated automatically by GitHub Actions*"
+        
+        # Find existing comment
+        existing_comment_id=$(gh api repos/$REPO/issues/$PR_NUMBER/comments \
+          --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("🎲 OpenSCAD Preview Images"))) | .id' \
+          | head -1)
+        
+        if [ -n "$existing_comment_id" ]; then
+          echo "Updating existing comment $existing_comment_id"
+          gh api repos/$REPO/issues/comments/$existing_comment_id \
+            --method PATCH \
+            --field body="$comment_body"
+        else
+          echo "Creating new comment"
+          gh pr comment $PR_NUMBER --body "$comment_body"
+        fi

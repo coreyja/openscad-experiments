@@ -1,0 +1,37 @@
+name: 'Run Shellcheck'
+description: 'Find and run shellcheck on all shell scripts in the repository'
+runs:
+  using: 'composite'
+  steps:
+    - name: Find shell scripts
+      shell: bash
+      id: find-scripts
+      run: |
+        # Find .sh files and files with bash shebang
+        scripts=$(find . -name "*.sh" -type f)
+        shebang_scripts=$(find . -type f -exec grep -l '^#!/bin/bash\|^#!/usr/bin/env bash' {} \; 2>/dev/null | grep -v '.git')
+        all_scripts=$(echo -e "$scripts\n$shebang_scripts" | sort -u | grep -v '^$')
+        
+        echo "Found shell scripts:"
+        echo "$all_scripts"
+        
+        if [ -n "$all_scripts" ]; then
+          echo "has-scripts=true" >> $GITHUB_OUTPUT
+          echo "scripts<<EOF" >> $GITHUB_OUTPUT
+          echo "$all_scripts" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "has-scripts=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Run shellcheck
+      shell: bash
+      if: steps.find-scripts.outputs.has-scripts == 'true'
+      run: |
+        echo "Running shellcheck on found scripts..."
+        echo "${{ steps.find-scripts.outputs.scripts }}" | while IFS= read -r script; do
+          if [ -n "$script" ]; then
+            echo "Checking: $script"
+            shellcheck "$script"
+          fi
+        done
