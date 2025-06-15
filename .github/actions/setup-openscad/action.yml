@@ -1,0 +1,10 @@
+name: 'Setup OpenSCAD'
+description: 'Install OpenSCAD and dependencies for headless rendering'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install OpenSCAD
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openscad xvfb

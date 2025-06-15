@@ -1,0 +1,42 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run shellcheck on scripts
+      uses: ./.github/actions/shellcheck
+
+  pr-preview:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup OpenSCAD
+      uses: ./.github/actions/setup-openscad
+    
+    - name: Generate preview images
+      id: generate-previews
+      uses: ./.github/actions/generate-previews
+    
+    - name: Upload preview artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: openscad-previews-${{ github.event.pull_request.number }}
+        path: preview_output/
+        retention-days: 30
+    
+    - name: Create PR comment with previews
+      uses: ./.github/actions/pr-comment
+      with:
+        preview-files: ${{ steps.generate-previews.outputs.preview-files }}
+        pr-number: ${{ github.event.pull_request.number }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}

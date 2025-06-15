@@ -1,0 +1,80 @@
+name: 'Create Release with Assets'
+description: 'Create a GitHub release and upload STL files and preview images'
+inputs:
+  stl-files:
+    description: 'Space-separated list of STL files to upload'
+    required: true
+  preview-files:
+    description: 'Space-separated list of preview image files to upload'
+    required: true
+  github-token:
+    description: 'GitHub token for creating releases'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Create release
+      shell: bash
+      id: create_release
+      run: |
+        tag_name="release-${{ github.sha }}"
+        
+        # Create the release body
+        release_body="Automated release of STL files from OpenSCAD models.
+        
+        Generated from commit: ${{ github.sha }}
+        
+        ## Generated Files
+        
+        ### STL Files"
+        
+        for stl_file in ${{ inputs.stl-files }}; do
+          if [ -f "$stl_file" ]; then
+            release_body="$release_body
+        - $(basename "$stl_file")"
+          fi
+        done
+        
+        release_body="$release_body
+        
+        ### Preview Images"
+        
+        for preview_file in ${{ inputs.preview-files }}; do
+          if [ -f "$preview_file" ]; then
+            release_body="$release_body
+        - $(basename "$preview_file")"
+          fi
+        done
+        
+        # Create release using gh CLI
+        gh release create "$tag_name" \
+          --title "STL Release ${{ github.sha }}" \
+          --notes "$release_body"
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+    
+    - name: Upload STL files to release
+      shell: bash
+      run: |
+        tag_name="release-${{ github.sha }}"
+        for stl_file in ${{ inputs.stl-files }}; do
+          if [ -f "$stl_file" ]; then
+            echo "Uploading: $stl_file"
+            gh release upload "$tag_name" "$stl_file"
+          fi
+        done
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+    
+    - name: Upload preview images to release
+      shell: bash
+      run: |
+        tag_name="release-${{ github.sha }}"
+        for preview_file in ${{ inputs.preview-files }}; do
+          if [ -f "$preview_file" ]; then
+            echo "Uploading: $preview_file"
+            gh release upload "$tag_name" "$preview_file"
+          fi
+        done
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
