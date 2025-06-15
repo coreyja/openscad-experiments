@@ -31,16 +31,34 @@ jobs:
       id: generate-previews
       uses: ./.github/actions/generate-previews
     
+    - name: List generated files
+      shell: bash
+      id: list-files
+      run: |
+        if [ -d "preview_output" ] && [ "$(ls -A preview_output/*.png 2>/dev/null)" ]; then
+          file_list=""
+          for png_file in preview_output/*.png; do
+            if [ -f "$png_file" ]; then
+              base_name=$(basename "$png_file" .png)
+              file_list="${file_list} ${base_name}"
+            fi
+          done
+          echo "files=${file_list}" >> $GITHUB_OUTPUT
+        fi
+    
     - name: Upload preview artifacts
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: openscad-previews-${{ github.event.pull_request.number }}
         path: preview_output/
         retention-days: 30
+        if-no-files-found: ignore
     
     - name: Create PR comment with previews
       uses: ./.github/actions/pr-comment
       with:
         preview-files: ${{ steps.generate-previews.outputs.preview-files }}
+        file-list: ${{ steps.list-files.outputs.files }}
         pr-number: ${{ github.event.pull_request.number }}
         github-token: ${{ secrets.GITHUB_TOKEN }}

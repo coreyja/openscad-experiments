@@ -4,6 +4,9 @@ inputs:
   preview-files:
     description: 'Space-separated list of preview image files'
     required: true
+  file-list:
+    description: 'Space-separated list of file basenames'
+    required: false
   pr-number:
     description: 'Pull request number'
     required: true
@@ -23,12 +26,17 @@ runs:
         echo "Generated preview images for this PR:" >> $GITHUB_OUTPUT
         echo "" >> $GITHUB_OUTPUT
         
+        # Get artifact download URL
+        artifact_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        
         for preview_file in ${{ inputs.preview-files }}; do
           if [ -f "$preview_file" ]; then
             base_name=$(basename "$preview_file" .png)
             echo "### ${base_name}" >> $GITHUB_OUTPUT
             echo "" >> $GITHUB_OUTPUT
-            echo "📎 [Download ${base_name}.png](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)" >> $GITHUB_OUTPUT
+            echo "📎 [Download all preview images](${artifact_url})" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "**File**: \`${base_name}.png\`" >> $GITHUB_OUTPUT
             echo "" >> $GITHUB_OUTPUT
           fi
         done
