@@ -5,7 +5,7 @@ inputs:
     description: 'Space-separated list of preview image files'
     required: true
   file-list:
-    description: 'Space-separated list of file basenames'
+    description: 'Space-separated list of file base names'
     required: false
   pr-number:
     description: 'Pull request number'
@@ -16,56 +16,39 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Generate preview comment body
+    - name: Create comment with preview links
       shell: bash
-      id: preview-comment
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ inputs.pr-number }}
       run: |
-        echo "comment-body<<EOF" >> $GITHUB_OUTPUT
-        echo "## 🎲 OpenSCAD Preview Images" >> $GITHUB_OUTPUT
-        echo "" >> $GITHUB_OUTPUT
-        echo "Generated preview images for this PR:" >> $GITHUB_OUTPUT
-        echo "" >> $GITHUB_OUTPUT
+        # Create comment body
+        comment_body="## 🎲 OpenSCAD Preview Images"$'\n\n'"Generated preview images for this PR:"$'\n\n'
         
-        # Get artifact download URL
-        artifact_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        
+        # List preview files
         for preview_file in ${{ inputs.preview-files }}; do
           if [ -f "$preview_file" ]; then
             base_name=$(basename "$preview_file" .png)
-            
-            # Encode image as base64 for inline display
-            image_base64=$(base64 -w 0 "$preview_file")
-            
-            echo "<details>" >> $GITHUB_OUTPUT
-            echo "<summary>🎲 <strong>${base_name}</strong> - Click to view preview</summary>" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            echo "![${base_name} preview](data:image/png;base64,${image_base64})" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            echo "📎 [Download all preview images](${artifact_url})" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
-            echo "</details>" >> $GITHUB_OUTPUT
-            echo "" >> $GITHUB_OUTPUT
+            comment_body="${comment_body}✅ **${base_name}.png**"$'\n'
           fi
         done
         
-        echo "" >> $GITHUB_OUTPUT
-        echo "---" >> $GITHUB_OUTPUT
-        echo "*Preview images generated automatically by GitHub Actions*" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-    
-    - name: Find Comment
-      uses: peter-evans/find-comment@v3
-      id: find-comment
-      with:
-        issue-number: ${{ inputs.pr-number }}
-        comment-author: 'github-actions[bot]'
-        body-includes: '🎲 OpenSCAD Preview Images'
-    
-    - name: Create or update comment
-      uses: peter-evans/create-or-update-comment@v4
-      with:
-        token: ${{ inputs.github-token }}
-        comment-id: ${{ steps.find-comment.outputs.comment-id }}
-        issue-number: ${{ inputs.pr-number }}
-        body: ${{ steps.preview-comment.outputs.comment-body }}
-        edit-mode: replace
+        # Add artifact download link
+        artifact_url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        comment_body="${comment_body}"$'\n'"📎 [View and download preview images in the workflow artifacts](${artifact_url})"$'\n\n'"---"$'\n'"*Preview images generated automatically by GitHub Actions*"
+        
+        # Find existing comment
+        existing_comment_id=$(gh api repos/$REPO/issues/$PR_NUMBER/comments \
+          --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("🎲 OpenSCAD Preview Images"))) | .id' \
+          | head -1)
+        
+        if [ -n "$existing_comment_id" ]; then
+          echo "Updating existing comment $existing_comment_id"
+          gh api repos/$REPO/issues/comments/$existing_comment_id \
+            --method PATCH \
+            --field body="$comment_body"
+        else
+          echo "Creating new comment"
+          gh pr comment $PR_NUMBER --body "$comment_body"
+        fi
