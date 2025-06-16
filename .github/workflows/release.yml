@@ -2,29 +2,34 @@ name: Main Branch Release
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  releases: write
 
 jobs:
   build-release:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup OpenSCAD
-      uses: ./.github/actions/setup-openscad
-    
-    - name: Generate STL files
-      id: generate-stl
-      uses: ./.github/actions/generate-stl
-    
-    - name: Generate preview images
-      id: generate-previews
-      uses: ./.github/actions/generate-previews
-    
-    - name: Create release with assets
-      uses: ./.github/actions/create-release
-      with:
-        stl-files: ${{ steps.generate-stl.outputs.stl-files }}
-        preview-files: ${{ steps.generate-previews.outputs.preview-files }}
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+
+      - name: Setup OpenSCAD
+        uses: ./.github/actions/setup-openscad
+
+      - name: Generate STL files
+        id: generate-stl
+        uses: ./.github/actions/generate-stl
+
+      - name: Generate preview images
+        id: generate-previews
+        uses: ./.github/actions/generate-previews
+
+      - name: Create release with assets
+        uses: ./.github/actions/create-release
+        with:
+          stl-files: ${{ steps.generate-stl.outputs.stl-files }}
+          preview-files: ${{ steps.generate-previews.outputs.preview-files }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
